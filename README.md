@@ -1,2 +1,2 @@
-# my-scripts
+# My Scripts
 Useful scripts
