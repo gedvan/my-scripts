@@ -57,6 +57,9 @@ sudo apt-get -y install \
     unity-tweak-tool \
     jq \
     google-chrome-stable \
+    vlc \
+    cmake \
+    python-dev \
     ;
 
 # Remove some unnecessary packages
