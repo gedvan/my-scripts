@@ -1,0 +1,2 @@
+DUMP_DIR=/path/to/dbdumpdir
+LOG_DIR=/path/to/logdir
