@@ -37,7 +37,8 @@ LOG_FILE="$LOG_DIR/dump-databases_$(date +'%Y-%m').log"
 exec 1> >(tee -a "$LOG_FILE")
 exec 2>&1
 
-echo "\n=== Dump de banco de dados iniciado em: $(date +%c) ==="
+echo ""
+echo "=== Dump de banco de dados iniciado em: $(date +%c) ==="
 echo "Diretório de dump: $DUMP_DIR"
 
 for MYSQL_CNF_FILE in $(ls $MYSQL_CNF_DIR/*.cnf); do
@@ -45,21 +46,21 @@ for MYSQL_CNF_FILE in $(ls $MYSQL_CNF_DIR/*.cnf); do
 	DBNAME=$(basename $MYSQL_CNF_FILE | cut -f1 -d.)
 	echo "Gerando o dump do banco '$DBNAME'..."
 
-	# Prepara o comando de dump
-	MYSQL_DUMP="mysqldump --defaults-extra-file=$MYSQL_CNF_FILE --databases $DBNAME"
-
 	# Diretório para o dump daquele banco de dados
 	DUMP_DIR_DB="$DUMP_DIR/$DBNAME"
 	if [ ! -d $DUMP_DIR_DB ]; then
 		mkdir -p $DUMP_DIR_DB
 	fi
 
+	# Prepara o comando de dump
+	MYSQL_DUMP="mysqldump --defaults-extra-file=$MYSQL_CNF_FILE --databases $DBNAME"
+
 	DATE=$(date +%F)
 	IFS="-" read YEAR MONTH DAY <<< $DATE
 
 	# Dump diário de hoje
-	DUMP_DAILY="$DUMP_DIR_DB/dump-daily_${DBNAME}_$DATE.sql"
-	$MYSQL_DUMP > $DUMP_DAILY
+	DUMP_DAILY="$DUMP_DIR_DB/dump-daily_${DBNAME}_$DATE.sql.gz"
+	$MYSQL_DUMP | gzip > $DUMP_DAILY
 
 	if [ $? -ne 0 ]; then
 		echo "Erro ao gerar o dump."
@@ -69,32 +70,32 @@ for MYSQL_CNF_FILE in $(ls $MYSQL_CNF_DIR/*.cnf); do
 	echo "Dump gerado: $DUMP_DAILY"
 
 	# Apaga os dumps diários com mais de 7 dias
-	find $DUMP_DIR_DB -name "dump-daily_${DBNAME}_*.sql" -mtime +7 -exec echo "Excluindo dump diário antigo: {}" \; -exec rm {} \;
+	find $DUMP_DIR_DB -name "dump-daily_${DBNAME}_*.sql.gz" -mtime +7 -exec echo "Excluindo dump diário antigo: {}" \; -exec rm {} \;
 
 	# Se for domingo, salva o dump semanal
 	if [ $(date +%u) = "7" ]; then
-		DUMP_WEEKLY="$DUMP_DIR_DB/dump-weekly_${DBNAME}_$DATE.sql"
+		DUMP_WEEKLY="$DUMP_DIR_DB/dump-weekly_${DBNAME}_$DATE.sql.gz"
 		echo "Salvando dump semanal: $DUMP_WEEKLY"
 		cp $DUMP_DAILY $DUMP_WEEKLY
 	fi
 
 	# Apaga os dumps semanais com mais de 1 mês
-	find $DUMP_DIR_DB -name "dump-weekly_${DBNAME}_*.sql" -mtime +31 -exec echo "Excluindo dump semanal antigo: {}" \; -exec rm '{}' \;
+	find $DUMP_DIR_DB -name "dump-weekly_${DBNAME}_*.sql.gz" -mtime +31 -exec echo "Excluindo dump semanal antigo: {}" \; -exec rm '{}' \;
 
 	# Se for o último dia do mês, salva o dump mensal
 	LAST_DAY=$(cal | awk 'FNR>2{d+=NF}END{print d}')
 	if [ $DAY = $LAST_DAY ]; then
-		DUMP_MONTHLY="$DUMP_DIR_DB/dump-monthly_${DBNAME}_$YEAR-$MONTH.sql"
+		DUMP_MONTHLY="$DUMP_DIR_DB/dump-monthly_${DBNAME}_$YEAR-$MONTH.sql.gz"
 		echo "Salvando dump mensal: $DUMP_MONTHLY"
 		cp $DUMP_DAILY $DUMP_MONTHLY
 	fi
 
 	# Apaga os dumps mensais com mais de 1 ano
-	find $DUMP_DIR_DB -name "dump-monthly_${DBNAME}_*.sql" -mtime +365 -exec echo "Excluindo dump mensal antigo: {}" \; -exec rm '{}' \;
+	find $DUMP_DIR_DB -name "dump-monthly_${DBNAME}_*.sql.gz" -mtime +365 -exec echo "Excluindo dump mensal antigo: {}" \; -exec rm '{}' \;
 
 	# Se for o último dia do ano, salva o dump anual
 	if [ $MONTH = "12" ] && [ $DAY = "31" ]; then
-		DUMP_YEARLY="$DUMP_DIR_DB/dump-yearly_${DBNAME}_$YEAR.sql"
+		DUMP_YEARLY="$DUMP_DIR_DB/dump-yearly_${DBNAME}_$YEAR.sql.gz"
 		echo "Salvando dump anual: $DUMP_MONTHLY"
 		cp $DUMP_DAILY $DUMP_YEARLY
 	fi
