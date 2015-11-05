@@ -1,17 +1,32 @@
 #!/bin/bash
 
+# PARAMS
 # Read params from conf file (emails, passwords, etc.)
+
 if [ ! -f params.conf ]; then
     source ./params.conf
 fi
 
+# SUDO
+# Allows sudo on this script
+
+SUDOER_LINE="$USER ALL=(ALL) NOPASSWD:$(readlink -f $0)"
+SUDOER_FILE="/etc/sudoers.d/$USER"
+sudo grep "$SUDOER_LINE" $SUDOER_FILE  > /dev/null 2> /dev/null
+if [ $? -ne 0 ]; then
+    echo $SUDOER_LINE | sudo tee -a $SUDOER_FILE > /dev/null
+    sudo chmod 0400 $SUDOER_FILE
+fi
 
 # EXTRA REPOSITORIES
 
 # Google Chrome
-wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-sudo sh -c 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+wget -qO - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+sudo sh -c 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
 
+# Arc Theme
+wget -qO - http://download.opensuse.org/repositories/home:Horst3180/xUbuntu_15.04/Release.key | sudo apt-key add -
+sudo sh -c "echo 'deb http://download.opensuse.org/repositories/home:/Horst3180/xUbuntu_15.04/ /' >> /etc/apt/sources.list.d/arc-theme.list"
 
 # PACKAGES INSTALLATION
 
@@ -19,56 +34,16 @@ sudo sh -c 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /et
 PACKAGES_LIST=$(cat packages.list | xargs)
 
 # Setup default answers for questions asked during install
-echo "mysql-server mysql-server/root_password $MYSQL_PASSWORD" | sudo debconf-set-selections
-echo "mysql-server mysql-server/root_password_again $MYSQL_PASSWORD" | sudo debconf-set-selections
+sudo debconf-set-selections <<< "mysql-server mysql-server/root_password password $MYSQL_PASSWORD"
+sudo debconf-set-selections <<< "mysql-server mysql-server/root_password_again password $MYSQL_PASSWORD"
 
 # Install Ubuntu packages
 sudo apt-get -y update
 sudo apt-get -y dist-upgrade
-sudo apt-get -y install \
-    vim \
-    git \
-    git-extras \
-    synaptic \
-    php5 \
-    mysql-server \
-    mysql-client \
-    apache2 \
-    libapache2-mpm-itk \
-    mysql-client \
-    mysql-server \
-    postgresql-client \
-    postgresql \
-    sqlite3 \
-    php5 \
-    php5-curl \
-    php5-gd \
-    php5-mysql \
-    php5-pgsql \
-    php5-sqlite \
-    php5-xdebug \
-    php-pear \
-    phpmyadmin \
-    phppgadmin \
-    curl \
-    openjdk-8-jre \
-    sqlitebrowser \
-    faenza-icon-theme \
-    unity-tweak-tool \
-    jq \
-    google-chrome-stable \
-    vlc \
-    cmake \
-    python-dev \
-    ;
+sudo apt-get -y install $PACKAGES_LIST
 
 # Remove some unnecessary packages
-sudo apt-get -y remove \
-    unity-lens-music \
-    unity-lens-photos \
-    unity-lens-shopping \
-    unity-lens-video \
-    ;
+#sudo apt-get -y remove ...
 
 # Cleanup
 sudo apt-get clean
@@ -101,6 +76,7 @@ echo "alias mv='mv -i'" >> ~/.bash_aliases
 echo "alias rm='rm -i'" >> ~/.bash_aliases
 
 # Generate SSH keys
+mkdir -p ~/.ssh
 ssh-keygen -t rsa -b 4096 -C "$SSHKEY_EMAIL" -N "$SSHKEY_PASSWORD" -f ~/.ssh/id_rsa
 
 # Git user info
@@ -112,7 +88,12 @@ dconf write /com/canonical/indicator/datetime/show-date true
 dconf write /com/canonical/indicator/datetime/show-day true
 dconf write /com/canonical/unity/lenses/remote-content-search '"none"'
 
-# Faenza icon theme
+# Desktop theme
 gsettings set org.gnome.desktop.interface icon-theme 'Faenza-Dark'
+gsettings set org.gnome.desktop.wm.preferences theme "Arc-Darker"
+gsettings set org.gnome.desktop.interface gtk-theme "Arc-Darker"
 
+# Apache setup
+sudo a2enmod rewrite
+sudo service apache2 restart
 
